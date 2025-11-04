@@ -225,8 +225,10 @@ mod tests {
             .write_all(b"test")
             .unwrap();
 
-        let mut options = FileFilterOptions::default();
-        options.include_extensions = Some(vec!["rs".to_string()]);
+        let options = FileFilterOptions {
+            include_extensions: Some(vec!["rs".to_string()]),
+            ..Default::default()
+        };
 
         let filter = FileFilter::new(options);
 
@@ -249,8 +251,10 @@ mod tests {
             .write_all(&vec![b'x'; 2_000_000])
             .unwrap();
 
-        let mut options = FileFilterOptions::default();
-        options.max_size = Some(1); // 1MB limit
+        let options = FileFilterOptions {
+            max_size: Some(1), // 1MB limit
+            ..Default::default()
+        };
 
         let filter = FileFilter::new(options);
 
