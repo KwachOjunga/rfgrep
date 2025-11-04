@@ -70,7 +70,6 @@ impl StdinSearcher {
     /// # }
     /// ```
     pub async fn search(&self, options: StdinSearchOptions) -> RfgrepResult<()> {
-        // Build regex with case sensitivity support
         let regex_pattern = if options.case_sensitive {
             options.search_pattern.clone()
         } else {
@@ -85,7 +84,6 @@ impl StdinSearcher {
         let mut line_number = 0;
         let mut match_count = 0;
 
-        // Read and process stdin line by line
         for line_result in reader.lines() {
             line_number += 1;
             let line = line_result.map_err(RfgrepError::Io)?;
@@ -100,9 +98,7 @@ impl StdinSearcher {
             if should_include {
                 match_count += 1;
 
-                // Only collect full match details if not in count or files-with-matches mode
                 if !options.count && !options.files_with_matches {
-                    // Find match position for column information
                     let (matched_text, column_start, column_end) =
                         if let Some(mat) = regex.find(&line) {
                             (mat.as_str().to_string(), mat.start(), mat.end())
@@ -123,7 +119,6 @@ impl StdinSearcher {
                     matches.push(search_match);
                 }
 
-                // Check if we've reached the maximum number of matches
                 if let Some(max) = options.max_matches {
                     if match_count >= max {
                         break;
@@ -132,7 +127,6 @@ impl StdinSearcher {
             }
         }
 
-        // Output results based on the requested mode
         self.output_results(matches, match_count, &options)
     }
 
@@ -144,18 +138,14 @@ impl StdinSearcher {
         options: &StdinSearchOptions,
     ) -> RfgrepResult<()> {
         if options.count {
-            // Count mode: just print the number
             println!("{}", match_count);
         } else if options.files_with_matches {
-            // Files-with-matches mode: print "<stdin>" if any matches found
             if match_count > 0 {
                 println!("<stdin>");
             }
         } else if matches.is_empty() {
-            // No matches found
             self.output_no_matches(options);
         } else {
-            // Full output with formatted matches
             self.output_matches(&matches, options)?;
         }
 
@@ -175,7 +165,6 @@ impl StdinSearcher {
         matches: &[SearchMatch],
         options: &StdinSearchOptions,
     ) -> RfgrepResult<()> {
-        // Print summary header unless in quiet or JSON mode
         if !options.quiet && options.output_format != CliOutputFormat::Json && !options.ndjson {
             println!(
                 "\n{} {} {}",
@@ -185,7 +174,6 @@ impl StdinSearcher {
             );
         }
 
-        // Create formatter with appropriate output format
         let formatter = OutputFormatter::new(if options.ndjson {
             crate::output_formats::OutputFormat::Json
         } else {
@@ -201,7 +189,6 @@ impl StdinSearcher {
         })
         .with_ndjson(options.ndjson);
 
-        // Format and print results
         let output =
             formatter.format_results(matches, &options.original_pattern, Path::new("<stdin>"));
 
@@ -215,12 +202,6 @@ impl StdinSearcher {
     }
 }
 
-impl Default for StdinSearcher {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,10 +210,5 @@ mod tests {
     fn test_stdin_searcher_creation() {
         let searcher = StdinSearcher::new();
         assert!(std::mem::size_of_val(&searcher) == 0); // Zero-sized type
-    }
-
-    #[test]
-    fn test_stdin_searcher_default() {
-        let _searcher = StdinSearcher::default();
     }
 }
