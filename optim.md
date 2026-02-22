@@ -10,3 +10,9 @@ The primary objectives of optim:
   - Learn the structure of the cache that rfgrep uses. 
 
  [Note:] if you are reading this; this branch is yet to be released.
+
+
+21/02/2026
+
+-- current output errs on both after and before texts. Nothing is captured in before.
+-- remove `src/output` directory.

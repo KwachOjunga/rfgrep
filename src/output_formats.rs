@@ -215,6 +215,7 @@ impl OutputFormatter {
     #[allow(dead_code)]
     fn format_text(&self, matches: &[SearchMatch], query: &str, path: &Path) -> String {
         let mut output = String::new();
+        let word_len = query.len();
         // metadata header
         if self.include_metadata {
             output.push_str(&format!("Query: {query}\n"));
@@ -222,32 +223,45 @@ impl OutputFormatter {
             output.push_str(&format!("Total matches: {}\n\n", matches.len()));
         }
 
+        // Changes being introduced reuse the memchr method find
+        // to iterate through matched text in order to ease the highlighting process
+
+        // [Note:] Currently there is no way to handle highlighting of multiple instances of a search pattern found
+        // within a matched text.
+
         // default one-line-per-match: path:line:col: line-with-highlight
         for m in matches {
+            let ind_match = find_match_indices(query, &m.matched_text);
+            let match_indices = ind_match.as_slice();
             let line_len = m.line.len();
-            let column_start = m.column_start.min(line_len);
-            let column_end = m.column_end.min(line_len);
-
+            let column_start = m.column_start;
+            let column_end = m.column_end;
+            println!("{:#?}", match_indices);
             let before = if column_start < line_len {
                 &m.line[..column_start]
             } else {
                 ""
             };
             let matched = &m.matched_text;
-            let after = if column_end > line_len {
+            println!("column_end :{} \nline_len: {}", &column_end, &line_len);
+            println!("char at column_end: {}", &m.line[column_end..]);
+            println!("char at column_start: {}", &m.line[column_start..]);
+            let after = if column_end < line_len {
                 &m.line[column_end..]
             } else {
                 ""
             };
 
+            // This ordering will not work for multiple instances of highlighting in the same line
             if self.use_color {
                 // ANSI yellow highlight for match
-                let highlighted = format!("\x1b[33m{matched}\x1b[0m");
+                let highlighted = highlight(matched.as_str(), match_indices, word_len);
+                // let highlighted = format!("\x1b[33m{matched}\x1b[0m");
                 output.push_str(&format!(
                     // "{}:{}:{}: {before}{highlighted}{after}\n",
-                    "{}: {after}\n",
+                    "{}:{}: {highlighted}\n",
                     m.path.display(),
-                    // m.line_number,
+                    m.line_number,
                     // column_start + 1
                 ));
             } else {
@@ -530,4 +544,37 @@ fn escape_html(s: &str) -> String {
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
         .replace("'", "&#39;")
+}
+
+fn find_match_indices(pattern: &str, matched_text: &str) -> Vec<usize> {
+    use memchr::memmem;
+    let mut result = Vec::new();
+    // for val in memmem::find_iter(pattern.as_bytes(), matched_text) {
+    //     result.push(val)
+    // }
+    let iterator = memmem::find_iter(pattern.as_bytes(), matched_text);
+    for ind in iterator {
+        result.push(ind);
+    }
+    return result;
+    //iterator
+}
+
+fn highlight(text: &str, starts: &[usize], word_len: usize) -> String {
+    let mut result = String::new();
+    let mut last = 0;
+    println!("actual text: {text}");
+    for &start in starts {
+        // push text before match
+        result.push_str(&text[last..start]);
+        let highlighted = &text[start..start + word_len];
+        // push highlighted match
+        println!("highlighted: {}", highlighted);
+        result.push_str(format!("\x1b[33m{highlighted}\x1b[0m").as_str());
+        last = start + word_len;
+    }
+
+    // push remaining tail
+    result.push_str(&text[last..]);
+    result
 }
