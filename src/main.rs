@@ -59,7 +59,9 @@ fn main_inner() -> RfgrepResult<()> {
         let shutdown_flag = &SHUTDOWN_REQUESTED;
         ctrlc::set_handler(move || {
             shutdown_flag.store(true, AtomicOrdering::SeqCst);
+            // [@kwach:] find a different way to terminate the process
             eprintln!("\nShutdown requested, finishing current operations...");
+            std::process::abort();
         })
         .expect("Failed to set Ctrl-C handler");
     }
