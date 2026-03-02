@@ -82,9 +82,15 @@ impl OutputFormatter {
 
     /// Format search results
     #[allow(dead_code)]
-    pub fn format_results(&self, matches: &[SearchMatch], query: &str, path: &Path) -> String {
+    pub fn format_results(
+        &self,
+        git_branches: Option<&String>,
+        matches: &[SearchMatch],
+        query: &str,
+        path: &Path,
+    ) -> String {
         match self.format {
-            OutputFormat::Text => self.format_text(matches, query, path),
+            OutputFormat::Text => self.format_text(git_branches, matches, query, path),
             OutputFormat::Json => self.format_json(matches, query, path),
             OutputFormat::Xml => self.format_xml(matches, query, path),
             OutputFormat::Html => self.format_html(matches, query, path),
@@ -213,7 +219,13 @@ impl OutputFormatter {
 
     /// Format as plain text (default)
     #[allow(dead_code)]
-    fn format_text(&self, matches: &[SearchMatch], query: &str, path: &Path) -> String {
+    fn format_text(
+        &self,
+        git_branches: Option<&String>,
+        matches: &[SearchMatch],
+        query: &str,
+        path: &Path,
+    ) -> String {
         let mut output = String::new();
         let word_len = query.len();
         // metadata header
@@ -223,6 +235,9 @@ impl OutputFormatter {
             output.push_str(&format!("Total matches: {}\n\n", matches.len()));
         }
 
+        if git_branches.is_some() {
+            output.push_str(&format!("Branch Results for : {}\n", git_branches.unwrap()))
+        }
         if matches.is_empty() {
             return output;
         }
@@ -230,21 +245,23 @@ impl OutputFormatter {
         let mut path: &PathBuf = &matches[0].path;
         output.push_str(&format!("\x1b[38;2;40;172;201m{}\x1b[0m", path.display()));
         output.push('\n');
-        for m in matches {
+
+        for i in 0..matches.len() {
             let ind_match: Vec<usize> =
-                ::memchr::memmem::find_iter(m.matched_text.as_bytes(), query.as_bytes()).collect();
+                ::memchr::memmem::find_iter(matches[i].matched_text.as_bytes(), query.as_bytes())
+                    .collect();
             let match_indices = ind_match.as_slice();
-            let line_len = m.line.len();
-            let column_start = m.column_start.min(line_len);
-            let column_end = m.column_end.min(line_len);
+            let line_len = matches[i].line.len();
+            let column_start = matches[i].column_start.min(line_len);
+            let column_end = matches[i].column_end.min(line_len);
             let before = if column_start < line_len {
-                &m.line[..column_start]
+                &matches[i].line[..column_start]
             } else {
                 ""
             };
-            let matched = &m.matched_text;
+            let matched = &matches[i].matched_text;
             let after = if column_end < line_len {
-                &m.line[column_end..]
+                &matches[i].line[column_end..]
             } else {
                 ""
             };
@@ -252,39 +269,43 @@ impl OutputFormatter {
             if self.use_color {
                 // ANSI yellow highlight for match
                 let highlighted = highlight(matched.as_str(), match_indices, word_len);
-                if path == &m.path {
+                if path == &matches[i].path {
                     output.push_str(&format!(
                         "\x1b[38;2;167;29;222m{}\x1b[0m: {before}{highlighted}\n",
-                        m.line_number,
+                        matches[i].line_number,
                     ));
                 } else {
-                    path = &m.path;
+                    path = &matches[i].path;
                     output.push('\n');
                     output.push_str(&format!("\x1b[38;2;40;172;201m{}\x1b[0m", path.display()));
                     output.push('\n');
                     output.push_str(&format!(
                         "\x1b[38;2;167;29;222m{}\x1b[0m: {before}{highlighted}\n",
-                        m.line_number,
+                        matches[i].line_number,
                     ));
                 }
             } else {
                 output.push_str(&format!(
                     "{}:{}:{}: {before}{matched}{after}\n",
-                    m.path.display(),
-                    m.line_number,
+                    matches[i].path.display(),
+                    matches[i].line_number,
                     column_start + 1
                 ));
             }
 
             // if context requested, append a small block
-            if self.include_context && (!m.context_before.is_empty() || !m.context_after.is_empty())
+            if self.include_context
+                && (!matches[i].context_before.is_empty() || !matches[i].context_after.is_empty())
             {
                 output.push_str("-- context --\n");
-                for (num, line) in &m.context_before {
+                for (num, line) in &matches[i].context_before {
                     output.push_str(&format!("  {num} │ {line}\n"));
                 }
-                output.push_str(&format!("→ {} │ {before}{matched}{after}\n", m.line_number));
-                for (num, line) in &m.context_after {
+                output.push_str(&format!(
+                    "→ {} │ {before}{matched}{after}\n",
+                    matches[i].line_number
+                ));
+                for (num, line) in &matches[i].context_after {
                     output.push_str(&format!("  {num} │ {line}\n"));
                 }
                 output.push('\n');

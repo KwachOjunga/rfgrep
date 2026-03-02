@@ -187,8 +187,12 @@ impl StdinSearcher {
         })
         .with_ndjson(options.ndjson);
 
-        let output =
-            formatter.format_results(matches, &options.original_pattern, Path::new("<stdin>"));
+        let output = formatter.format_results(
+            None,
+            matches,
+            &options.original_pattern,
+            Path::new("<stdin>"),
+        );
 
         if options.output_format == CliOutputFormat::Json || options.ndjson {
             print!("{output}");

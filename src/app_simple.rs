@@ -13,6 +13,7 @@ use crate::streaming_search::{StreamingConfig, StreamingSearchPipeline};
 use crate::tui::{init_terminal, restore_terminal, TuiApp};
 use crate::walker::{walk_dir_with_options, WalkerOptions};
 use colored::Colorize;
+use rfgrep::git_utils::{branches, switch_branch};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -88,6 +89,7 @@ impl RfgrepApp {
                 ndjson,
                 count,
                 files_with_matches,
+                all_branches,
                 ..
             } => {
                 self.handle_search(
@@ -119,6 +121,7 @@ impl RfgrepApp {
                     *count,
                     *files_with_matches,
                     quiet,
+                    *all_branches,
                 )
                 .await
             }
@@ -304,7 +307,9 @@ impl RfgrepApp {
         count: bool,
         files_with_matches: bool,
         quiet: bool,
+        all_branches: bool,
     ) -> RfgrepResult<()> {
+        // use c::git::switch_branch;
         let search_pattern = self.build_search_pattern(pattern, mode);
         let search_algorithm = self.map_search_algorithm(algorithm);
 
@@ -371,32 +376,99 @@ impl RfgrepApp {
             println!("Searching {} files...", filtered_files.len());
         }
 
-        let all_matches = self
-            .perform_search(
-                &filtered_files,
-                &search_pattern,
-                search_algorithm,
-                context_lines,
-                case_sensitive,
-                invert_match,
-                max_matches,
-                timeout_per_file,
-                threads,
-                files_with_matches,
+        if all_branches {
+            let git_branches = branches()?;
+            // let mut output = vec![];
+            for (i, branch) in git_branches.iter().enumerate() {
+                if i == 0 {
+                    let search_algo = search_algorithm.clone();
+                    switch_branch(&branch[2..])?;
+                    let all_matches = self
+                        .perform_search(
+                            &filtered_files,
+                            &search_pattern,
+                            search_algo,
+                            context_lines,
+                            case_sensitive,
+                            invert_match,
+                            max_matches,
+                            timeout_per_file,
+                            threads,
+                            files_with_matches,
+                            count,
+                        )
+                        .await?;
+                    self.output_results(
+                        Some(branch),
+                        &all_matches,
+                        pattern,
+                        search_path,
+                        output_format.clone(),
+                        ndjson,
+                        count,
+                        files_with_matches,
+                        quiet,
+                    )?;
+                } else {
+                    switch_branch(branch.trim())?;
+                    let all_matches = self
+                        .perform_search(
+                            &filtered_files,
+                            &search_pattern,
+                            search_algorithm.clone(),
+                            context_lines,
+                            case_sensitive,
+                            invert_match,
+                            max_matches,
+                            timeout_per_file,
+                            threads,
+                            files_with_matches,
+                            count,
+                        )
+                        .await?;
+                    self.output_results(
+                        Some(branch),
+                        &all_matches,
+                        pattern,
+                        search_path,
+                        output_format.clone(),
+                        ndjson,
+                        count,
+                        files_with_matches,
+                        quiet,
+                    )?;
+                }
+            }
+            switch_branch(&git_branches[0][2..])?;
+            Ok(())
+        } else {
+            let all_matches = self
+                .perform_search(
+                    &filtered_files,
+                    &search_pattern,
+                    search_algorithm,
+                    context_lines,
+                    case_sensitive,
+                    invert_match,
+                    max_matches,
+                    timeout_per_file,
+                    threads,
+                    files_with_matches,
+                    count,
+                )
+                .await?;
+            self.output_results(
+                None,
+                &all_matches,
+                pattern,
+                search_path,
+                output_format,
+                ndjson,
                 count,
+                files_with_matches,
+                quiet,
             )
-            .await?;
-
-        self.output_results(
-            &all_matches,
-            pattern,
-            search_path,
-            output_format,
-            ndjson,
-            count,
-            files_with_matches,
-            quiet,
-        )
+        }
     }
 
     /// Build search pattern based on mode
@@ -506,6 +578,7 @@ impl RfgrepApp {
     /// Output the search results
     fn output_results(
         &self,
+        git_branches: Option<&String>,
         all_matches: &[crate::processor::SearchMatch],
         pattern: &str,
         search_path: &Path,
@@ -523,6 +596,7 @@ impl RfgrepApp {
             self.output_files_with_matches(all_matches)
         } else {
             self.output_matches(
+                git_branches,
                 all_matches,
                 pattern,
                 search_path,
@@ -565,6 +639,7 @@ impl RfgrepApp {
     /// Output the actual matches
     fn output_matches(
         &self,
+        git_branches: Option<&String>,
         all_matches: &[crate::processor::SearchMatch],
         pattern: &str,
         search_path: &Path,
@@ -596,7 +671,7 @@ impl RfgrepApp {
         })
         .with_ndjson(ndjson);
 
-        let output = formatter.format_results(all_matches, pattern, search_path);
+        let output = formatter.format_results(git_branches, all_matches, pattern, search_path);
 
         if output_format == crate::cli::OutputFormat::Json || ndjson {
             print!("{output}");
