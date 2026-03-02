@@ -198,7 +198,7 @@ impl StreamingSearchPipeline {
             });
         }
 
-        // drop(tx); // Close the sender
+        drop(tx); // Close the sender
 
         // Collect results
         let mut all_matches = Vec::new();
@@ -211,8 +211,6 @@ impl StreamingSearchPipeline {
             }
         }
 
-        drop(tx);
-        drop(rx);
         // Sort results
         all_matches.sort();
         Ok(all_matches)
