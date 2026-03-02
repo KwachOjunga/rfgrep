@@ -5,4 +5,5 @@
 robustness_test_*.txt
 #todo.md
 .idea/
+.daily-todo.md
 [binary.bin](http://_vscodecontentref_/25)   # only if you decide to ignore it

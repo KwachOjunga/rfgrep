@@ -189,6 +189,10 @@ PERFORMANCE TIPS:
         #[clap(long, value_parser, default_value_t = false)]
         search_all_files: bool,
 
+        /// Allow search to occur across all branches of a repository
+        #[clap(long, value_parser, default_value_t = false)]
+        all_branches: bool,
+
         /// Only search text files (conservative mode)
         #[clap(long, value_parser, default_value_t = false)]
         text_only: bool,

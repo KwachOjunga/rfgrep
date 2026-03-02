@@ -118,6 +118,9 @@ pub mod test_utils;
 /// Interactive search mode implementation
 mod interactive;
 
+/// Git repository search utilities
+mod git;
+
 /// File listing and information utilities
 pub mod list;
 
