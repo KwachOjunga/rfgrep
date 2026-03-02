@@ -87,7 +87,7 @@
 #![allow(clippy::print_literal)]
 // Core application modules
 /// Simplified application architecture with async runtime support
-pub mod app_simple;
+// pub mod app_simple;
 
 /// Application submodules (stdin, filters, handlers, etc.)
 pub mod app;
@@ -119,7 +119,7 @@ pub mod test_utils;
 mod interactive;
 
 /// Git repository search utilities
-mod git;
+pub mod git_utils;
 
 /// File listing and information utilities
 pub mod list;
