@@ -100,7 +100,6 @@ impl StreamingSearchPipeline {
                 // Archive matching uses processor::SearchMatch directly.
                 // Post-processing (invert match) is skipped as find_matches_streaming only returns positive matches.
                 let mut final_matches = matches;
-
                 if let Some(max_matches) = self.config.max_matches {
                     if final_matches.len() > max_matches {
                         final_matches.truncate(max_matches);
@@ -108,7 +107,6 @@ impl StreamingSearchPipeline {
                 }
                 return RfgrepResult::Ok(final_matches);
             }
-
             let reader: Box<dyn Read + Send> = if let Some(compression) =
                 crate::compression::CompressionType::from_extension(path)
             {
@@ -118,7 +116,6 @@ impl StreamingSearchPipeline {
                 let file = File::open(path).map_err(RfgrepError::Io)?;
                 Box::new(file)
             };
-
             let reader = BufReader::with_capacity(self.config.buffer_size, reader);
 
             // Create search algorithm instance
@@ -138,7 +135,6 @@ impl StreamingSearchPipeline {
                     final_matches.truncate(max_matches);
                 }
             }
-
             RfgrepResult::Ok(final_matches)
         };
 
@@ -202,7 +198,7 @@ impl StreamingSearchPipeline {
             });
         }
 
-        drop(tx); // Close the sender
+        // drop(tx); // Close the sender
 
         // Collect results
         let mut all_matches = Vec::new();
@@ -215,6 +211,8 @@ impl StreamingSearchPipeline {
             }
         }
 
+        drop(tx);
+        drop(rx);
         // Sort results
         all_matches.sort();
         Ok(all_matches)
